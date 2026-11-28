@@ -135,6 +135,7 @@ body[data-state="running"] .off-clock { display: none; }
 .grid.g10 { grid-template-columns: repeat(5, 1fr); }
 .grid.g13 { grid-template-columns: repeat(7, 1fr); }
 .grid.g2 { grid-template-columns: repeat(2, 1fr); }
+.grid.g4 { grid-template-columns: repeat(4, 1fr); }
 @media (min-width: 700px) {
   .grid.g10 { grid-template-columns: repeat(10, 1fr); }
   .grid.g13 { grid-template-columns: repeat(13, 1fr); }
@@ -253,6 +254,14 @@ body[data-state="running"] .off-clock { display: none; }
     </div>
 
     <div class="group">
+      <h3>Deck</h3>
+      <fieldset class="seg" id="deckSeg">
+        <label><input type="radio" name="deck" value="half" checked><b>Half deck</b><span>Missing colour shown, clock 26 cards</span></label>
+        <label><input type="radio" name="deck" value="full"><b>Full deck</b><span>Colour hidden, clock all 52</span></label>
+      </fieldset>
+    </div>
+
+    <div class="group">
       <h3>Answer</h3>
       <fieldset class="seg" id="modeSeg">
         <label><input type="radio" name="mode" value="value"><b>Value only</b><span>A/10, 2/Q, 3/K, 4–9, J</span></label>
@@ -287,10 +296,18 @@ body[data-state="running"] .off-clock { display: none; }
   let state = "ready", deck = [], missing = null, els = [], d = 0, t0 = 0, tFirst = null;
   let mode = store.get("clock-mode") === "value" ? "value" : "exact";
   let pick = { r: null, s: null };
-  const sessions = { value: { n: 0, ok: 0, times: [] }, exact: { n: 0, ok: 0, times: [] } };
-  const bestKey = m => m === "exact" ? "clock-best-exact" : "clock-best";
+  let deckMode = store.get("clock-deck") === "full" ? "full" : "half";
+  let roundCfg = "";
+  // Stats and best times are kept per deck + answer combination.
+  const cfg = () => `${deckMode}-${mode}`;
+  const sessions = {};
+  const sessFor = c => sessions[c] || (sessions[c] = { n: 0, ok: 0, times: [] });
+  const bestKey = c => ({ "half-value": "clock-best", "half-exact": "clock-best-exact" })[c] || "clock-best-" + c;
   const best = {};
-  ["value", "exact"].forEach(m => { const b = parseFloat(store.get(bestKey(m))); best[m] = b > 0 ? b : null; });
+  const getBest = c => {
+    if (!(c in best)) { const b = parseFloat(store.get(bestKey(c))); best[c] = b > 0 ? b : null; }
+    return best[c];
+  };
 
   const setState = s => { state = s; document.body.dataset.state = s; };
 
@@ -339,8 +356,8 @@ body[data-state="running"] .off-clock { display: none; }
       RANKS.forEach(r => {
         const b = makeKey(r, el => choose("r", r, el)); b.dataset.r = r; g.appendChild(b);
       });
-      const sg = document.createElement("div"); sg.className = "grid g2";
-      SUITS.filter(su => su.red === missing.red).forEach(su => {
+      const sg = document.createElement("div"); sg.className = "grid " + (deckMode === "full" ? "g4" : "g2");
+      SUITS.filter(su => deckMode === "full" || su.red === missing.red).forEach(su => {
         const b = makeKey(su.s + VS, el => choose("s", su.s, el), "suit" + (su.red ? " red-ink" : ""));
         b.dataset.s = su.s; b.setAttribute("aria-label", { "♠": "Spades", "♥": "Hearts", "♦": "Diamonds", "♣": "Clubs" }[su.s]);
         sg.appendChild(b);
@@ -364,10 +381,17 @@ body[data-state="running"] .off-clock { display: none; }
     ready.hidden = false;
     d = 0; layout(els, d);
 
-    const color = missing.red ? "Red" : "Black";
-    const glyphs = missing.red ? "♥" + VS + "♦" + VS : "♠" + VS + "♣" + VS;
-    $("missing").innerHTML = `Missing card: <b>${color}</b><span class="suits ${missing.red ? "red-ink" : ""}">${glyphs}</span>`;
-    $("readyText").innerHTML = `51 cards. One <b>${color.toLowerCase()}</b> card is missing.<br>Swipe right to spread. The clock starts when the first card shows.`;
+    roundCfg = cfg();
+    const tail = "<br>Swipe right to spread. The clock starts when the first card shows.";
+    if (deckMode === "full") {
+      $("missing").innerHTML = `Missing card: <b>any colour</b>`;
+      $("readyText").innerHTML = `51 cards. One card is missing.${tail}`;
+    } else {
+      const color = missing.red ? "Red" : "Black";
+      const glyphs = missing.red ? "♥" + VS + "♦" + VS : "♠" + VS + "♣" + VS;
+      $("missing").innerHTML = `Missing card: <b>${color}</b><span class="suits ${missing.red ? "red-ink" : ""}">${glyphs}</span>`;
+      $("readyText").innerHTML = `51 cards. One <b>${color.toLowerCase()}</b> card is missing.${tail}`;
+    }
     resultEl.innerHTML = "";
     setState("ready");
     buildPad();
@@ -409,11 +433,12 @@ body[data-state="running"] .off-clock { display: none; }
 
   function finish(secs, ok, picked) {
     keys.forEach(k => k.disabled = true);
-    const sess = sessions[mode];
+    const sess = sessFor(roundCfg);
     sess.n++;
     if (ok) {
       sess.ok++; sess.times.push(secs);
-      if (best[mode] === null || secs < best[mode]) { best[mode] = secs; store.set(bestKey(mode), secs); }
+      const b = getBest(roundCfg);
+      if (b === null || secs < b) { best[roundCfg] = secs; store.set(bestKey(roundCfg), secs); }
     }
     timerEl.textContent = secs.toFixed(2) + "s";
     const split = tFirst === null
@@ -432,13 +457,14 @@ body[data-state="running"] .off-clock { display: none; }
   }
 
   function renderStats() {
-    const sess = sessions[mode];
-    const parts = [mode === "exact" ? "Exact card" : "Value only"];
+    const c = state === "done" ? roundCfg : cfg();
+    const sess = sessFor(c);
+    const parts = [(c.startsWith("full") ? "Full deck" : "Half deck") + ", " + (c.endsWith("exact") ? "exact card" : "value only")];
     if (sess.n) {
       parts.push(`${sess.ok}/${sess.n} correct`);
       if (sess.times.length) parts.push(`avg ${(sess.times.reduce((a, b) => a + b, 0) / sess.times.length).toFixed(1)}s`);
     }
-    if (best[mode] !== null) parts.push(`best ${best[mode].toFixed(1)}s`);
+    if (getBest(c) !== null) parts.push(`best ${getBest(c).toFixed(1)}s`);
     $("stats").textContent = parts.join("  ·  ");
   }
 
@@ -568,6 +594,14 @@ body[data-state="running"] .off-clock { display: none; }
       renderStats();
     });
   });
+  document.querySelectorAll('input[name="deck"]').forEach(r => {
+    r.checked = r.value === deckMode;
+    r.addEventListener("change", () => {
+      if (!r.checked) return;
+      deckMode = r.value; store.set("clock-deck", deckMode);
+      if (state === "ready") newRound(); else renderStats();
+    });
+  });
 
   $("settingsBtn").addEventListener("click", () => {
     if (state === "running") return;
@@ -579,8 +613,8 @@ body[data-state="running"] .off-clock { display: none; }
   });
   const closeSettings = () => {
     sheet.hidden = true;
-    // A finished round answered in the other mode moves straight on to a fresh deck.
-    if (state === "done" && keys.length !== (mode === "value" ? GROUPS.length : 15)) newRound();
+    // A finished round played with other settings moves straight on to a fresh deck.
+    if (state === "done" && roundCfg !== cfg()) newRound();
     $("settingsBtn").focus({ preventScroll: true });
   };
   $("doneBtn").addEventListener("click", closeSettings);
