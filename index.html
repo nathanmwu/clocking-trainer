@@ -146,7 +146,8 @@ body[data-state="running"] .off-clock { display: none; }
 .grid.g10 { grid-template-columns: repeat(5, 1fr); }
 .grid.g1 { grid-template-columns: 1fr; }
 .key.idk { font: 600 15px var(--f-ui); letter-spacing: 0; color: var(--muted); }
-.countdown { position: absolute; inset: 0; display: grid; place-items: center; font: 600 72px var(--f-index); color: var(--fg); font-variant-numeric: tabular-nums; }
+/* Sits to the right of the stacked deck so the first card stays fully readable. */
+.countdown { position: absolute; top: 0; bottom: 0; right: 0; left: min(calc(18px + var(--cw) * var(--s)), calc(100% - 72px)); z-index: 60; display: grid; place-items: center; font: 600 72px var(--f-index); color: var(--fg); font-variant-numeric: tabular-nums; }
 .grid.g2 { grid-template-columns: repeat(2, 1fr); }
 .grid.g4 { grid-template-columns: repeat(4, 1fr); }
 @media (min-width: 700px) { .grid.g13 { grid-template-columns: repeat(13, 1fr); } .grid.g10 { grid-template-columns: repeat(10, 1fr); } }
@@ -568,15 +569,16 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
     tFirst = null;
     table.focus({ preventScroll: true });
     if (roundPractice === "timed") {
-      // 3-second countdown with the deck hidden; the pass starts when it reaches zero.
+      // 3-second countdown with the deck already showing; the scroll starts at zero.
       phase = "countdown";
       const cd = $("countdown"), tc = performance.now();
+      deckEl.hidden = false;
       cd.hidden = false;
       const count = () => {
         if (state !== "running" || phase !== "countdown") return;
         const left = 3 - (performance.now() - tc) / 1000;
         if (left > 0) { cd.textContent = Math.ceil(left); rafId = requestAnimationFrame(count); return; }
-        cd.hidden = true; deckEl.hidden = false;
+        cd.hidden = true;
         phase = "scroll";
         t0 = performance.now();
         rafId = requestAnimationFrame(autoTick);
