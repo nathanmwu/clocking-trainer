@@ -14,7 +14,8 @@ img { max-width: 100%; }
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600&family=Inter:wght@400;500;600&display=swap">
 <style>
-/* Layout: one column, one screen. Banner, the spread, the answer pad, the result. */
+/* Layout: one column, one screen. Banner, the spread, the answer pad, the result.
+   Settings and Stats open as full-screen sheets. */
 :root {
   --bg: #e8ebe7;
   --surface: #f5f6f3;
@@ -30,6 +31,11 @@ img { max-width: 100%; }
   --ink-red: #c4262c;
   --ink-black: #17191a;
   --shadow: 0 1px 2px rgba(0,0,0,.12), 0 2px 6px rgba(0,0,0,.06);
+  /* chart series (validated for colour-blind separation on --surface) */
+  --c-total: #7b847d;
+  --c-first: #2a6fb5;
+  --c-second: #009a7b;
+  --c-high: #d0621c;
   --f-ui: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-index: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
   --cw: 116px;
@@ -42,6 +48,7 @@ img { max-width: 100%; }
     --accent: #6cbd97; --accent-fg: #0f1a14; --good: #5fc28f; --bad: #ec6b67;
     --card-edge: rgba(0,0,0,.5); --shadow: 0 1px 2px rgba(0,0,0,.5), 0 2px 8px rgba(0,0,0,.35);
     --ink-red-ui: #f07a76;
+    --c-total: #8e978f; --c-first: #4f8fd6; --c-second: #14b08e; --c-high: #e0782d;
     color-scheme: dark;
   }
 }
@@ -50,6 +57,7 @@ img { max-width: 100%; }
   --accent: #6cbd97; --accent-fg: #0f1a14; --good: #5fc28f; --bad: #ec6b67;
   --card-edge: rgba(0,0,0,.5); --shadow: 0 1px 2px rgba(0,0,0,.5), 0 2px 8px rgba(0,0,0,.35);
   --ink-red-ui: #f07a76;
+  --c-total: #8e978f; --c-first: #4f8fd6; --c-second: #14b08e; --c-high: #e0782d;
   color-scheme: dark;
 }
 html, body { height: 100%; }
@@ -71,12 +79,12 @@ body[data-state="done"] .only-done { display: block; }
 body[data-state="running"] .off-clock { display: none; }
 
 .status { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 38px; }
-.status-right { display: flex; align-items: center; gap: 12px; }
+.status-right { display: flex; align-items: center; gap: 8px; }
 .missing { font-size: 15px; color: var(--muted); }
 .missing b { color: var(--fg); font-weight: 600; }
 .missing .suits { letter-spacing: 2px; margin-left: 4px; }
 .red-ink { color: var(--ink-red-ui, var(--ink-red)); }
-.timer { font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 600; color: var(--fg); }
+.timer { font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 600; color: var(--fg); margin-right: 4px; }
 .icon-btn {
   width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--line);
   background: var(--surface); color: var(--muted); cursor: pointer; display: grid; place-items: center; padding: 0;
@@ -87,7 +95,7 @@ body[data-state="running"] .off-clock { display: none; }
 /* The spread */
 .table {
   position: relative; height: calc(var(--ch) * var(--s) + 36px);
-  overflow: hidden; touch-action: none; cursor: grab;
+  overflow: hidden; touch-action: none; cursor: grab; isolation: isolate;
   border-radius: 14px; background: var(--surface); border: 1px solid var(--line);
 }
 .table.dragging { cursor: grabbing; }
@@ -129,17 +137,15 @@ body[data-state="running"] .off-clock { display: none; }
   background: var(--accent); color: var(--accent-fg); padding: 11px 22px;
 }
 .btn.small { padding: 8px 16px; font-size: 14px; }
-.btn:focus-visible, .key:focus-visible, .icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn.quiet { background: var(--surface); color: var(--fg); border: 1px solid var(--line); }
+.btn.danger { background: var(--bad); color: #fff; }
+.btn:focus-visible, .key:focus-visible, .icon-btn:focus-visible, .pills button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .pad { display: flex; flex-direction: column; gap: 8px; }
 .grid { display: grid; gap: 8px; }
-.grid.g10 { grid-template-columns: repeat(5, 1fr); }
 .grid.g13 { grid-template-columns: repeat(7, 1fr); }
 .grid.g2 { grid-template-columns: repeat(2, 1fr); }
 .grid.g4 { grid-template-columns: repeat(4, 1fr); }
-@media (min-width: 700px) {
-  .grid.g10 { grid-template-columns: repeat(10, 1fr); }
-  .grid.g13 { grid-template-columns: repeat(13, 1fr); }
-}
+@media (min-width: 700px) { .grid.g13 { grid-template-columns: repeat(13, 1fr); } }
 .key {
   font: 600 19px var(--f-index); letter-spacing: .02em;
   height: 52px; border-radius: 10px; cursor: pointer; padding: 0;
@@ -167,12 +173,14 @@ body[data-state="running"] .off-clock { display: none; }
 .verdict .sub { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .stats { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; text-align: center; }
 
-/* Settings sheet */
-.sheet { position: fixed; inset: 0; z-index: 50; background: var(--bg); overflow-y: auto;
+/* Sheets (settings, stats) */
+.sheet { position: fixed; inset: 0; z-index: 100; background: var(--bg); overflow-y: auto;
   padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+.sheet .sheet-inner { min-height: 0; }
 .sheet h2 { margin: 0; font-size: 18px; font-weight: 600; }
 .sheet h3 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .group { display: flex; flex-direction: column; gap: 12px; }
+.group-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .slider { display: grid; grid-template-columns: 9em minmax(0, 1fr) 9em; align-items: center; gap: 12px; font-size: 14px; color: var(--muted); }
 .slider label { color: var(--fg); font-weight: 500; }
 .slider input { width: 100%; accent-color: var(--accent); }
@@ -188,6 +196,35 @@ body[data-state="running"] .off-clock { display: none; }
 .seg input { position: absolute; opacity: 0; pointer-events: none; }
 .seg label:has(input:checked) { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .seg label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Stats */
+.pills { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); align-self: flex-start; }
+.pills button { font: 500 13px var(--f-ui); border: 0; background: none; color: var(--muted); padding: 6px 12px; border-radius: 7px; cursor: pointer; }
+.pills button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+.tbl-wrap { overflow-x: auto; }
+table.data { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+table.data th { text-align: right; font-weight: 500; font-size: 12px; color: var(--muted); padding: 0 8px 8px; white-space: nowrap; }
+table.data td { text-align: right; padding: 8px; border-top: 1px solid var(--line); white-space: nowrap; }
+table.data th:first-child, table.data td:first-child { text-align: left; padding-left: 0; }
+table.data td:last-child, table.data th:last-child { padding-right: 0; }
+table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; }
+.sw { width: 10px; height: 10px; border-radius: 3px; flex: none; display: inline-block; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; overflow: visible; }
+.chart text { font: 11px var(--f-ui); fill: var(--muted); font-variant-numeric: tabular-nums; }
+.chart .endlabel { font-size: 12px; font-weight: 600; fill: var(--fg); }
+.empty { font-size: 14px; color: var(--muted); padding: 28px 0; text-align: center; }
+.tip {
+  position: absolute; pointer-events: none; z-index: 2; white-space: nowrap;
+  background: var(--fg); color: var(--bg); font-size: 12px; line-height: 1.45; padding: 6px 9px; border-radius: 8px;
+  font-variant-numeric: tabular-nums; transform: translate(-50%, calc(-100% - 10px));
+}
+.ok-mark { color: var(--good); font-weight: 600; }
+.no-mark { color: var(--bad); font-weight: 600; }
+.clear-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
 
 @media (max-width: 420px) {
   :root { --cw: 104px; --ch: 148px; }
@@ -207,6 +244,9 @@ body[data-state="running"] .off-clock { display: none; }
     <div class="status-right">
       <div class="timer only-done" id="timer"></div>
       <button class="btn small only-done" id="nextBtn">Next deck</button>
+      <button class="icon-btn off-clock" id="statsBtn" aria-label="Stats">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V12M10 20V6M15 20v-9M20 20V9"/></svg>
+      </button>
       <button class="icon-btn off-clock" id="settingsBtn" aria-label="Settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
       </button>
@@ -260,13 +300,69 @@ body[data-state="running"] .off-clock { display: none; }
         <label><input type="radio" name="deck" value="full"><b>Full deck</b><span>Colour hidden, clock all 52</span></label>
       </fieldset>
     </div>
+  </div>
+</div>
+
+<div class="sheet" id="statsSheet" hidden>
+  <div class="sheet-inner">
+    <div class="status">
+      <h2>Stats</h2>
+      <button class="btn small" id="statsDone">Done</button>
+    </div>
 
     <div class="group">
-      <h3>Answer</h3>
-      <fieldset class="seg" id="modeSeg">
-        <label><input type="radio" name="mode" value="value"><b>Value only</b><span>A/10, 2/Q, 3/K, 4–9, J</span></label>
-        <label><input type="radio" name="mode" value="exact" checked><b>Exact card</b><span>Rank A–K plus suit</span></label>
-      </fieldset>
+      <div class="pills" id="statsDeck" role="group" aria-label="Deck">
+        <button data-v="half">Half deck</button><button data-v="full">Full deck</button>
+      </div>
+      <p class="note" id="statsSummary"></p>
+      <div class="panel tbl-wrap">
+        <table class="data" id="avgTable">
+          <thead><tr><th></th><th>Last 10 avg</th><th>All-time avg</th><th>Best</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-head">
+        <h3>Running average, last 10 decks</h3>
+        <div class="legend">
+          <span><i class="sw" style="background:var(--c-first)"></i>First pass</span>
+          <span><i class="sw" style="background:var(--c-second)"></i>Second pass</span>
+        </div>
+      </div>
+      <div class="panel"><div class="chart" id="trend"></div></div>
+    </div>
+
+    <div class="group">
+      <div class="group-head">
+        <h3>Time distribution</h3>
+        <div class="pills" id="histMetric" role="group" aria-label="Histogram metric">
+          <button data-v="total">Total</button><button data-v="first">First pass</button><button data-v="second">Second pass</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="legend" id="histLegend" style="margin-bottom:10px"></div>
+        <div class="chart" id="hist"></div>
+      </div>
+    </div>
+
+    <div class="group">
+      <h3>Recent decks</h3>
+      <div class="panel tbl-wrap">
+        <table class="data" id="recentTable">
+          <thead><tr><th>Card</th><th>Result</th><th>Total</th><th>First pass</th><th>Second pass</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="clear-row">
+      <button class="btn small quiet" id="clearBtn">Clear history</button>
+      <span id="confirmClear" hidden>Delete every saved deck for both modes?
+        <button class="btn small danger" id="clearYes">Delete</button>
+        <button class="btn small quiet" id="clearNo">Cancel</button>
+      </span>
     </div>
   </div>
 </div>
@@ -279,8 +375,7 @@ body[data-state="running"] .off-clock { display: none; }
     { s: "♦", red: true }, { s: "♣", red: false }
   ];
   const RANKS = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
-  const GROUPS = ["A/10","2/Q","3/K","4","5","6","7","8","9","J"];
-  const groupOf = r => ({ A: "A/10", "10": "A/10", "2": "2/Q", Q: "2/Q", "3": "3/K", K: "3/K" })[r] || r;
+  const HIGH = new Set(["A","10","2","Q","3","K"]); // ranks that share a clock value; second pass takes longer
   const GAP = 24;        // minimum px of each card's corner showing, at size 1
   const DECK_N = 51;
   const MIN_S = 0.8, MAX_S = 2.4;
@@ -292,22 +387,19 @@ body[data-state="running"] .off-clock { display: none; }
   };
   const table = $("table"), deckEl = $("deck"), ready = $("ready");
   const pad = $("pad"), resultEl = $("result"), timerEl = $("timer");
+  const sheet = $("settings"), statsSheet = $("statsSheet");
 
   let state = "ready", deck = [], missing = null, els = [], d = 0, t0 = 0, tFirst = null;
-  let mode = store.get("clock-mode") === "value" ? "value" : "exact";
   let pick = { r: null, s: null };
   let deckMode = store.get("clock-deck") === "full" ? "full" : "half";
   let roundCfg = "";
-  // Stats and best times are kept per deck + answer combination.
-  const cfg = () => `${deckMode}-${mode}`;
   const sessions = {};
   const sessFor = c => sessions[c] || (sessions[c] = { n: 0, ok: 0, times: [] });
-  const bestKey = c => ({ "half-value": "clock-best", "half-exact": "clock-best-exact" })[c] || "clock-best-" + c;
-  const best = {};
-  const getBest = c => {
-    if (!(c in best)) { const b = parseFloat(store.get(bestKey(c))); best[c] = b > 0 ? b : null; }
-    return best[c];
-  };
+
+  // Saved history: one record per finished deck.
+  let history = [];
+  try { const h = JSON.parse(store.get("clock-history") || "[]"); if (Array.isArray(h)) history = h; } catch (e) {}
+  const saveHistory = () => store.set("clock-history", JSON.stringify(history.slice(-5000)));
 
   const setState = s => { state = s; document.body.dataset.state = s; };
 
@@ -328,6 +420,7 @@ body[data-state="running"] .off-clock { display: none; }
     return `<div class="card${c.red ? " red" : ""}"><div class="idx">${r}</div><div class="pip">${c.s}${VS}</div><div class="idx br">${r}</div></div>`;
   };
   const label = c => c.r + c.s + VS;
+  const isRed = s => s === "♥" || s === "♦";
   const fillDeck = (container, cards) => {
     container.innerHTML = cards.map(cardHTML).join("");
     const list = [...container.children];
@@ -335,7 +428,7 @@ body[data-state="running"] .off-clock { display: none; }
     return list;
   };
 
-  // Answer pad
+  // Answer pad: 13 ranks + the suits still in play
   let keys = [];
   function makeKey(text, onClick, extra = "") {
     const b = document.createElement("button");
@@ -347,29 +440,21 @@ body[data-state="running"] .off-clock { display: none; }
   function buildPad() {
     pad.innerHTML = ""; keys = [];
     pick = { r: null, s: null };
-    if (mode === "value") {
-      const g = document.createElement("div"); g.className = "grid g10";
-      GROUPS.forEach(v => { const b = makeKey(v, () => answerValue(v)); b.dataset.g = v; g.appendChild(b); });
-      pad.appendChild(g);
-    } else {
-      const g = document.createElement("div"); g.className = "grid g13";
-      RANKS.forEach(r => {
-        const b = makeKey(r, el => choose("r", r, el)); b.dataset.r = r; g.appendChild(b);
-      });
-      const sg = document.createElement("div"); sg.className = "grid " + (deckMode === "full" ? "g4" : "g2");
-      SUITS.filter(su => deckMode === "full" || su.red === missing.red).forEach(su => {
-        const b = makeKey(su.s + VS, el => choose("s", su.s, el), "suit" + (su.red ? " red-ink" : ""));
-        b.dataset.s = su.s; b.setAttribute("aria-label", { "♠": "Spades", "♥": "Hearts", "♦": "Diamonds", "♣": "Clubs" }[su.s]);
-        sg.appendChild(b);
-      });
-      pad.appendChild(g); pad.appendChild(sg);
-    }
+    const g = document.createElement("div"); g.className = "grid g13";
+    RANKS.forEach(r => { const b = makeKey(r, el => choose("r", r, el)); b.dataset.r = r; g.appendChild(b); });
+    const sg = document.createElement("div"); sg.className = "grid " + (deckMode === "full" ? "g4" : "g2");
+    SUITS.filter(su => deckMode === "full" || su.red === missing.red).forEach(su => {
+      const b = makeKey(su.s + VS, el => choose("s", su.s, el), "suit" + (su.red ? " red-ink" : ""));
+      b.dataset.s = su.s; b.setAttribute("aria-label", { "♠": "Spades", "♥": "Hearts", "♦": "Diamonds", "♣": "Clubs" }[su.s]);
+      sg.appendChild(b);
+    });
+    pad.appendChild(g); pad.appendChild(sg);
   }
   function choose(kind, v, el) {
     if (state !== "running") return;
     pick[kind] = v;
     keys.forEach(k => { if (k.dataset[kind] !== undefined) k.classList.toggle("picked", k === el); });
-    if (pick.r && pick.s) answerExact();
+    if (pick.r && pick.s) answer();
   }
 
   function newRound() {
@@ -381,7 +466,7 @@ body[data-state="running"] .off-clock { display: none; }
     ready.hidden = false;
     d = 0; layout(els, d);
 
-    roundCfg = cfg();
+    roundCfg = deckMode;
     const tail = "<br>Swipe right to spread. The clock starts when the first card shows.";
     if (deckMode === "full") {
       $("missing").innerHTML = `Missing card: <b>any colour</b>`;
@@ -395,7 +480,7 @@ body[data-state="running"] .off-clock { display: none; }
     resultEl.innerHTML = "";
     setState("ready");
     buildPad();
-    renderStats();
+    renderSessionLine();
     $("startBtn").focus({ preventScroll: true });
   }
 
@@ -417,29 +502,21 @@ body[data-state="running"] .off-clock { display: none; }
     else if (v === chosen) k.classList.add("wrong");
   });
 
-  function answerValue(g) {
-    if (state !== "running") return;
-    const secs = (performance.now() - t0) / 1000;
-    const truth = groupOf(missing.r);
-    mark("g", truth, g);
-    finish(secs, g === truth, g);
-  }
-  function answerExact() {
+  function answer() {
     const secs = (performance.now() - t0) / 1000;
     mark("r", missing.r, pick.r);
     mark("s", missing.s, pick.s);
-    finish(secs, pick.r === missing.r && pick.s === missing.s, pick.r + pick.s + VS);
-  }
-
-  function finish(secs, ok, picked) {
+    const ok = pick.r === missing.r && pick.s === missing.s;
     keys.forEach(k => k.disabled = true);
+
     const sess = sessFor(roundCfg);
     sess.n++;
-    if (ok) {
-      sess.ok++; sess.times.push(secs);
-      const b = getBest(roundCfg);
-      if (b === null || secs < b) { best[roundCfg] = secs; store.set(bestKey(roundCfg), secs); }
-    }
+    if (ok) { sess.ok++; sess.times.push(secs); }
+    const r3 = x => Math.round(x * 1000) / 1000;
+    history.push({ ts: Date.now(), deck: roundCfg, r: missing.r, s: missing.s, ok,
+      total: r3(secs), first: tFirst === null ? null : r3(tFirst) });
+    saveHistory();
+
     timerEl.textContent = secs.toFixed(2) + "s";
     const split = tFirst === null
       ? "last card not reached"
@@ -447,24 +524,25 @@ body[data-state="running"] .off-clock { display: none; }
     resultEl.innerHTML = `
       <div class="mini">${cardHTML(missing)}</div>
       <div class="verdict">
-        <div class="head ${ok ? "ok" : "no"}">${ok ? "Correct" : "Missed"} · ${label(missing)}${ok ? "" : `<span class="picked-note"> · you picked ${picked}</span>`}</div>
+        <div class="head ${ok ? "ok" : "no"}">${ok ? "Correct" : "Missed"} · ${label(missing)}${ok ? "" : `<span class="picked-note"> · you picked ${pick.r + pick.s + VS}</span>`}</div>
         <div class="total">${secs.toFixed(2)}s total</div>
         <div class="sub">${split}</div>
       </div>`;
     setState("done");
     $("nextBtn").focus({ preventScroll: true });
-    renderStats();
+    renderSessionLine();
   }
 
-  function renderStats() {
-    const c = state === "done" ? roundCfg : cfg();
+  function renderSessionLine() {
+    const c = state === "done" ? roundCfg : deckMode;
     const sess = sessFor(c);
-    const parts = [(c.startsWith("full") ? "Full deck" : "Half deck") + ", " + (c.endsWith("exact") ? "exact card" : "value only")];
+    const parts = [c === "full" ? "Full deck" : "Half deck"];
     if (sess.n) {
-      parts.push(`${sess.ok}/${sess.n} correct`);
+      parts.push(`${sess.ok}/${sess.n} correct this session`);
       if (sess.times.length) parts.push(`avg ${(sess.times.reduce((a, b) => a + b, 0) / sess.times.length).toFixed(1)}s`);
     }
-    if (getBest(c) !== null) parts.push(`best ${getBest(c).toFixed(1)}s`);
+    const bests = history.filter(h => h.deck === c && h.ok).map(h => h.total);
+    if (bests.length) parts.push(`best ${Math.min(...bests).toFixed(1)}s`);
     $("stats").textContent = parts.join("  ·  ");
   }
 
@@ -542,10 +620,7 @@ body[data-state="running"] .off-clock { display: none; }
       tFirst = (performance.now() - t0) / 1000;
     }
   }
-  attachSpread(table, {
-    active: () => state === "running",
-    move: dx => setProg(d + dx)
-  });
+  attachSpread(table, { active: () => state === "running", move: dx => setProg(d + dx) });
   document.addEventListener("keydown", e => {
     if (state !== "running" || !sheet.hidden) return;
     if (e.key === "ArrowRight") { setProg(d + GAP); e.preventDefault(); }
@@ -554,10 +629,9 @@ body[data-state="running"] .off-clock { display: none; }
   $("startBtn").addEventListener("click", start);
   $("nextBtn").addEventListener("click", newRound);
 
-  // Settings
-  const sizeEl = $("size"), sensEl = $("sens"), sheet = $("settings"), previewDeck = $("previewDeck");
+  // ---------- Settings ----------
+  const sizeEl = $("size"), sensEl = $("sens"), previewDeck = $("previewDeck");
   let previewEls = [], pd = 0;
-
   attachSpread($("previewTable"), {
     active: () => !sheet.hidden,
     move: dx => { pd = Math.min(maxProg(DECK_N), Math.max(0, pd + dx)); layout(previewEls, pd); }
@@ -583,23 +657,14 @@ body[data-state="running"] .off-clock { display: none; }
   }
   sizeEl.addEventListener("input", () => { setSize(parseFloat(sizeEl.value)); store.set("clock-size-v2", scale); });
   sensEl.addEventListener("input", () => { setSens(parseFloat(sensEl.value)); store.set("clock-sens", sens); });
-  window.addEventListener("resize", () => setSize(scale));
+  window.addEventListener("resize", () => { setSize(scale); if (!statsSheet.hidden) renderStats(); });
 
-  document.querySelectorAll('input[name="mode"]').forEach(r => {
-    r.checked = r.value === mode;
-    r.addEventListener("change", () => {
-      if (!r.checked) return;
-      mode = r.value; store.set("clock-mode", mode);
-      if (state === "ready") buildPad();
-      renderStats();
-    });
-  });
   document.querySelectorAll('input[name="deck"]').forEach(r => {
     r.checked = r.value === deckMode;
     r.addEventListener("change", () => {
       if (!r.checked) return;
       deckMode = r.value; store.set("clock-deck", deckMode);
-      if (state === "ready") newRound(); else renderStats();
+      if (state === "ready") newRound(); else renderSessionLine();
     });
   });
 
@@ -613,12 +678,223 @@ body[data-state="running"] .off-clock { display: none; }
   });
   const closeSettings = () => {
     sheet.hidden = true;
-    // A finished round played with other settings moves straight on to a fresh deck.
-    if (state === "done" && roundCfg !== cfg()) newRound();
+    // A finished round played with another deck setting moves straight on to a fresh deck.
+    if (state === "done" && roundCfg !== deckMode) newRound();
     $("settingsBtn").focus({ preventScroll: true });
   };
   $("doneBtn").addEventListener("click", closeSettings);
-  document.addEventListener("keydown", e => { if (e.key === "Escape" && !sheet.hidden) closeSettings(); });
+
+  // ---------- Stats ----------
+  let statsDeck = deckMode, histMetric = "total";
+  const fmt = x => x === null || x === undefined || !isFinite(x) ? "—" : x.toFixed(2) + "s";
+  const avg = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : null;
+  const NS = "http://www.w3.org/2000/svg";
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+  function setPills(id, v) {
+    $(id).querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === v)));
+  }
+  $("statsDeck").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    statsDeck = b.dataset.v; renderStats();
+  });
+  $("histMetric").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    histMetric = b.dataset.v; renderStats();
+  });
+
+  const niceStep = raw => {
+    const steps = [0.25, 0.5, 1, 2, 2.5, 5, 10, 15, 20, 30, 60, 120];
+    return steps.find(s => s >= raw) || 300;
+  };
+  const niceInt = raw => [1, 2, 5, 10, 20, 25, 50, 100, 200, 500].find(s => s >= raw) || 1000;
+  const secLabel = x => (Math.round(x * 100) / 100).toString() + "s";
+  // Bar with rounded data end (top) anchored square on the baseline.
+  const barPath = (x, y, w, h) => {
+    const r = Math.max(0, Math.min(4, w / 2, h));
+    return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+  };
+
+  function showTip(chart, x, y, html) {
+    let tip = chart.querySelector(".tip");
+    if (!tip) { tip = document.createElement("div"); tip.className = "tip"; chart.appendChild(tip); }
+    tip.innerHTML = html; tip.hidden = false;
+    const w = chart.clientWidth, half = tip.offsetWidth / 2;
+    tip.style.left = Math.min(w - half, Math.max(half, x)) + "px";
+    tip.style.top = y + "px";
+  }
+  const hideTip = chart => { const t = chart.querySelector(".tip"); if (t) t.hidden = true; };
+
+  function drawHist(el, vals, overlay, color) {
+    if (!vals.length) { el.innerHTML = `<div class="empty">No decks yet for this view. Finish a deck to see times here.</div>`; return; }
+    const W = Math.max(280, el.clientWidth), H = 210, m = { l: 34, r: 8, t: 10, b: 26 };
+    const pw = W - m.l - m.r, ph = H - m.t - m.b;
+    const lo = Math.min(...vals), hi = Math.max(...vals);
+    const w = niceStep(Math.max(hi - lo, 0.5) / 10);
+    const start = Math.floor(lo / w) * w;
+    const n = Math.max(1, Math.floor((hi - start) / w) + 1);
+    const bin = v => Math.min(n - 1, Math.floor((v - start) / w + 1e-9));
+    const base = new Array(n).fill(0), over = new Array(n).fill(0);
+    vals.forEach(v => base[bin(v)]++);
+    if (overlay) overlay.forEach(v => over[bin(v)]++);
+    const step = niceInt(Math.max(...base) / 4);
+    const yTop = Math.ceil(Math.max(...base) / step) * step;
+    const y = c => m.t + ph - (c / yTop) * ph;
+    const colW = pw / n, bw = Math.max(1, colW - 2);
+    let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Histogram of times">`;
+    for (let t = 0; t <= yTop; t += step) {
+      s += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line)" stroke-width="1"/>`;
+      s += `<text x="${m.l - 6}" y="${y(t) + 4}" text-anchor="end">${t}</text>`;
+    }
+    const every = Math.ceil((n + 1) / 7);
+    for (let i = 0; i <= n; i += every) {
+      s += `<text x="${m.l + i * colW}" y="${H - 8}" text-anchor="middle">${secLabel(start + i * w)}</text>`;
+    }
+    for (let i = 0; i < n; i++) {
+      const x = m.l + i * colW + 1;
+      if (base[i]) s += `<path d="${barPath(x, y(base[i]), bw, y(0) - y(base[i]))}" fill="${color}"/>`;
+      if (over[i]) s += `<path d="${barPath(x, y(over[i]), bw, y(0) - y(over[i]))}" fill="var(--c-high)" stroke="var(--surface)" stroke-width="2" paint-order="stroke"/>`;
+    }
+    for (let i = 0; i < n; i++) {
+      s += `<rect class="hit" data-i="${i}" x="${m.l + i * colW}" y="${m.t}" width="${colW}" height="${ph}" fill="transparent"/>`;
+    }
+    s += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(0)}" y2="${y(0)}" stroke="var(--muted)" stroke-width="1"/></svg>`;
+    el.innerHTML = s;
+    el.querySelectorAll(".hit").forEach(r => {
+      const i = +r.dataset.i;
+      const enter = () => {
+        const rng = `${secLabel(start + i * w)} – ${secLabel(start + (i + 1) * w)}`;
+        let html = `<b>${rng}</b><br>${base[i]} deck${base[i] === 1 ? "" : "s"}`;
+        if (overlay) html += `<br>${over[i]} with A/10, 2/Q, 3/K missing`;
+        const rect = el.getBoundingClientRect(), sv = el.querySelector("svg").getBoundingClientRect();
+        const k = sv.width / W;
+        showTip(el, (m.l + (i + 0.5) * colW) * k, Math.max(4, y(base[i]) * k), html);
+      };
+      r.addEventListener("pointerenter", enter);
+      r.addEventListener("pointerdown", enter);
+      r.addEventListener("pointerleave", () => hideTip(el));
+    });
+  }
+
+  const rolling = (a, k) => a.map((_, i) => avg(a.slice(Math.max(0, i - k + 1), i + 1)));
+
+  function drawTrend(el, first, second) {
+    const n = first.length;
+    if (n < 2) { el.innerHTML = `<div class="empty">Needs at least 2 correct decks that reached the last card.</div>`; return; }
+    const W = Math.max(280, el.clientWidth), H = 200, m = { l: 34, r: 58, t: 12, b: 26 };
+    const pw = W - m.l - m.r, ph = H - m.t - m.b;
+    const rf = rolling(first, 10), rs = rolling(second, 10);
+    const top = Math.max(...rf, ...rs);
+    const step = niceStep(top / 4);
+    const yTop = Math.max(step, Math.ceil(top / step) * step);
+    const x = i => m.l + (i / (n - 1)) * pw;
+    const y = v => m.t + ph - (v / yTop) * ph;
+    const line = arr => arr.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
+    let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Running average of first and second pass times">`;
+    for (let t = 0; t <= yTop + 1e-9; t += step) {
+      s += `<line x1="${m.l}" x2="${m.l + pw}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line)" stroke-width="1"/>`;
+      s += `<text x="${m.l - 6}" y="${y(t) + 4}" text-anchor="end">${secLabel(t)}</text>`;
+    }
+    const xEvery = niceInt((n - 1) / 6);
+    for (let i = 0; i < n; i += xEvery) s += `<text x="${x(i)}" y="${H - 8}" text-anchor="middle">${i + 1}</text>`;
+    s += `<path d="${line(rf)}" fill="none" stroke="var(--c-first)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    s += `<path d="${line(rs)}" fill="none" stroke="var(--c-second)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    const lf = rf[n - 1], ls = rs[n - 1];
+    let ly1 = y(lf), ly2 = y(ls);
+    if (Math.abs(ly1 - ly2) < 14) { const mid = (ly1 + ly2) / 2, up = ly1 < ly2 ? -7 : 7; ly1 = mid + up; ly2 = mid - up; }
+    s += `<circle cx="${x(n - 1)}" cy="${y(lf)}" r="4" fill="var(--c-first)" stroke="var(--surface)" stroke-width="2"/>`;
+    s += `<circle cx="${x(n - 1)}" cy="${y(ls)}" r="4" fill="var(--c-second)" stroke="var(--surface)" stroke-width="2"/>`;
+    s += `<text class="endlabel" x="${x(n - 1) + 9}" y="${ly1 + 4}">${lf.toFixed(1)}s</text>`;
+    s += `<text class="endlabel" x="${x(n - 1) + 9}" y="${ly2 + 4}">${ls.toFixed(1)}s</text>`;
+    s += `<g class="cross" visibility="hidden"><line y1="${m.t}" y2="${m.t + ph}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 3"/>
+      <circle r="4" fill="var(--c-first)" stroke="var(--surface)" stroke-width="2"/><circle r="4" fill="var(--c-second)" stroke="var(--surface)" stroke-width="2"/></g>`;
+    s += `<rect class="hit" x="${m.l}" y="${m.t}" width="${pw}" height="${ph}" fill="transparent"/></svg>`;
+    el.innerHTML = s;
+    const svg = el.querySelector("svg"), cross = svg.querySelector(".cross");
+    const [cl, c1, c2] = cross.children;
+    const onMove = e => {
+      const k = svg.getBoundingClientRect().width / W;
+      const px = (e.clientX - svg.getBoundingClientRect().left) / k;
+      const i = Math.max(0, Math.min(n - 1, Math.round(((px - m.l) / pw) * (n - 1))));
+      cross.setAttribute("visibility", "visible");
+      cl.setAttribute("x1", x(i)); cl.setAttribute("x2", x(i));
+      c1.setAttribute("cx", x(i)); c1.setAttribute("cy", y(rf[i]));
+      c2.setAttribute("cx", x(i)); c2.setAttribute("cy", y(rs[i]));
+      showTip(el, x(i) * k, Math.min(y(rf[i]), y(rs[i])) * k,
+        `<b>Deck ${i + 1}</b> · last-10 avg<br>First pass ${rf[i].toFixed(2)}s<br>Second pass ${rs[i].toFixed(2)}s`);
+    };
+    const hit = svg.querySelector(".hit");
+    hit.addEventListener("pointermove", onMove);
+    hit.addEventListener("pointerdown", onMove);
+    hit.addEventListener("pointerleave", () => { cross.setAttribute("visibility", "hidden"); hideTip(el); });
+  }
+
+  function renderStats() {
+    setPills("statsDeck", statsDeck);
+    setPills("histMetric", histMetric);
+    const all = history.filter(h => h.deck === statsDeck);
+    const good = all.filter(h => h.ok);
+    const passes = good.filter(h => h.first !== null);
+    const totals = good.map(h => h.total);
+    const firsts = passes.map(h => h.first);
+    const seconds = passes.map(h => h.total - h.first);
+
+    $("statsSummary").textContent = all.length
+      ? `${all.length} deck${all.length === 1 ? "" : "s"} · ${Math.round(100 * good.length / all.length)}% correct · times use correct answers only`
+      : "No decks saved yet for this mode.";
+
+    const row = (name, color, a) => `<tr><td><span class="rowname"><i class="sw" style="background:${color}"></i>${name}</span></td>
+      <td>${fmt(avg(a.slice(-10)))}</td><td>${fmt(avg(a))}</td><td>${a.length ? fmt(Math.min(...a)) : "—"}</td></tr>`;
+    $("avgTable").tBodies[0].innerHTML =
+      row("Total", "var(--c-total)", totals) + row("First pass", "var(--c-first)", firsts) + row("Second pass", "var(--c-second)", seconds);
+
+    drawTrend($("trend"), firsts, seconds);
+
+    const lg = $("histLegend");
+    if (histMetric === "second") {
+      const highSecs = passes.filter(h => HIGH.has(h.r)).map(h => h.total - h.first);
+      lg.innerHTML = `<span><i class="sw" style="background:var(--c-second)"></i>All decks</span>
+        <span><i class="sw" style="background:var(--c-high)"></i>A/10, 2/Q or 3/K missing</span>`;
+      drawHist($("hist"), seconds, highSecs, "var(--c-second)");
+    } else if (histMetric === "first") {
+      lg.innerHTML = `<span><i class="sw" style="background:var(--c-first)"></i>First pass, all decks</span>`;
+      drawHist($("hist"), firsts, null, "var(--c-first)");
+    } else {
+      lg.innerHTML = `<span><i class="sw" style="background:var(--c-total)"></i>Total time, all decks</span>`;
+      drawHist($("hist"), totals, null, "var(--c-total)");
+    }
+
+    const recent = all.slice(-10).reverse();
+    $("recentTable").tBodies[0].innerHTML = recent.length ? recent.map(h => `<tr>
+        <td class="${isRed(h.s) ? "red-ink" : ""}">${esc(h.r + h.s + VS)}</td>
+        <td>${h.ok ? '<span class="ok-mark">✓</span>' : '<span class="no-mark">✗</span>'}</td>
+        <td>${fmt(h.total)}</td><td>${fmt(h.first)}</td><td>${h.first === null ? "—" : fmt(h.total - h.first)}</td>
+      </tr>`).join("") : `<tr><td colspan="5" style="text-align:left;color:var(--muted)">No decks yet.</td></tr>`;
+  }
+
+  $("statsBtn").addEventListener("click", () => {
+    if (state === "running") return;
+    statsDeck = state === "done" ? roundCfg : deckMode;
+    $("confirmClear").hidden = true; $("clearBtn").hidden = false;
+    statsSheet.hidden = false;
+    renderStats();
+    $("statsDone").focus({ preventScroll: true });
+  });
+  const closeStats = () => { statsSheet.hidden = true; $("statsBtn").focus({ preventScroll: true }); };
+  $("statsDone").addEventListener("click", closeStats);
+  $("clearBtn").addEventListener("click", () => { $("clearBtn").hidden = true; $("confirmClear").hidden = false; });
+  $("clearNo").addEventListener("click", () => { $("confirmClear").hidden = true; $("clearBtn").hidden = false; });
+  $("clearYes").addEventListener("click", () => {
+    history = []; saveHistory();
+    $("confirmClear").hidden = true; $("clearBtn").hidden = false;
+    renderStats(); renderSessionLine();
+  });
+
+  document.addEventListener("keydown", e => {
+    if (e.key !== "Escape") return;
+    if (!sheet.hidden) closeSettings();
+    else if (!statsSheet.hidden) closeStats();
+  });
 
   const savedSize = parseFloat(store.get("clock-size-v2"));
   const savedSens = parseFloat(store.get("clock-sens"));
