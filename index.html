@@ -143,9 +143,10 @@ body[data-state="running"] .off-clock { display: none; }
 .pad { display: flex; flex-direction: column; gap: 8px; }
 .grid { display: grid; gap: 8px; }
 .grid.g13 { grid-template-columns: repeat(7, 1fr); }
+.grid.g10 { grid-template-columns: repeat(5, 1fr); }
 .grid.g2 { grid-template-columns: repeat(2, 1fr); }
 .grid.g4 { grid-template-columns: repeat(4, 1fr); }
-@media (min-width: 700px) { .grid.g13 { grid-template-columns: repeat(13, 1fr); } }
+@media (min-width: 700px) { .grid.g13 { grid-template-columns: repeat(13, 1fr); } .grid.g10 { grid-template-columns: repeat(10, 1fr); } }
 .key {
   font: 600 19px var(--f-index); letter-spacing: .02em;
   height: 52px; border-radius: 10px; cursor: pointer; padding: 0;
@@ -224,6 +225,16 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
 }
 .ok-mark { color: var(--good); font-weight: 600; }
 .no-mark { color: var(--bad); font-weight: 600; }
+.num-row { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); flex-wrap: wrap; }
+.num-row label { color: var(--fg); font-weight: 500; }
+.num-row input {
+  width: 6em; font: 500 15px var(--f-ui); padding: 8px 10px; border-radius: 8px; box-sizing: border-box;
+  border: 1px solid var(--line); background: var(--surface); color: var(--fg); -webkit-user-select: text; user-select: text;
+}
+.num-row input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.closed { position: absolute; inset: 0; display: grid; place-items: center; font-size: 15px; color: var(--muted); text-align: center; padding: 0 16px; }
+.filters { display: flex; gap: 8px; flex-wrap: wrap; }
+.stack { display: flex; flex-direction: column; gap: 20px; }
 .clear-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
 
 @media (max-width: 420px) {
@@ -255,6 +266,7 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
 
   <div class="table" id="table" tabindex="0" aria-label="Deck spread. Drag right or use the right arrow key.">
     <div class="deck" id="deck"></div>
+    <div class="closed" id="closedMsg" hidden>Deck closed. Name the missing value.</div>
     <div id="ready">
       <div class="back"></div>
       <div class="prompt">
@@ -294,6 +306,19 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
     </div>
 
     <div class="group">
+      <h3>Practice</h3>
+      <fieldset class="seg" id="practiceSeg">
+        <label><input type="radio" name="practice" value="free" checked><b>Free spread</b><span>Swipe at your own pace, name the exact card</span></label>
+        <label><input type="radio" name="practice" value="timed"><b>Timed pass</b><span>Deck scrolls at a set pace, then name the value</span></label>
+      </fieldset>
+      <div class="num-row" id="paceRow">
+        <label for="pace">First pass length</label>
+        <input type="number" id="pace" min="2" max="120" step="0.5" value="20" inputmode="decimal">
+        <span>seconds from first card to last</span>
+      </div>
+    </div>
+
+    <div class="group">
       <h3>Deck</h3>
       <fieldset class="seg" id="deckSeg">
         <label><input type="radio" name="deck" value="half" checked><b>Half deck</b><span>Missing colour shown, clock 26 cards</span></label>
@@ -311,17 +336,24 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
     </div>
 
     <div class="group">
-      <div class="pills" id="statsDeck" role="group" aria-label="Deck">
-        <button data-v="half">Half deck</button><button data-v="full">Full deck</button>
+      <div class="filters">
+        <div class="pills" id="statsMode" role="group" aria-label="Practice">
+          <button data-v="free">Free spread</button><button data-v="timed">Timed pass</button>
+        </div>
+        <div class="pills" id="statsDeck" role="group" aria-label="Deck">
+          <button data-v="half">Half deck</button><button data-v="full">Full deck</button>
+        </div>
       </div>
       <p class="note" id="statsSummary"></p>
+    </div>
+
+    <div class="stack" id="freeStats">
       <div class="panel tbl-wrap">
         <table class="data" id="avgTable">
           <thead><tr><th></th><th>Last 10 avg</th><th>All-time avg</th><th>Best</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
-    </div>
 
     <div class="group">
       <div class="group-head">
@@ -356,6 +388,29 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
         </table>
       </div>
     </div>
+    </div>
+
+    <div class="stack" id="timedStats" hidden>
+      <div class="group">
+        <h3>Success rate by first-pass length</h3>
+        <div class="panel"><div class="chart" id="paceChart"></div></div>
+      </div>
+      <div class="panel tbl-wrap">
+        <table class="data" id="paceTable">
+          <thead><tr><th>First pass</th><th>Decks</th><th>Correct</th><th>Success</th><th>Avg answer</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="group">
+        <h3>Recent timed decks</h3>
+        <div class="panel tbl-wrap">
+          <table class="data" id="timedRecent">
+            <thead><tr><th>Card</th><th>First pass</th><th>Result</th><th>Answer</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
 
     <div class="clear-row">
       <button class="btn small quiet" id="clearBtn">Clear history</button>
@@ -376,6 +431,9 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
   ];
   const RANKS = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
   const HIGH = new Set(["A","10","2","Q","3","K"]); // ranks that share a clock value; second pass takes longer
+  const GROUPS = ["A/10","2/Q","3/K","4","5","6","7","8","9","J"];
+  const groupOf = r => ({ A: "A/10", "10": "A/10", "2": "2/Q", Q: "2/Q", "3": "3/K", K: "3/K" })[r] || r;
+  const r3 = x => Math.round(x * 1000) / 1000;
   const GAP = 24;        // minimum px of each card's corner showing, at size 1
   const DECK_N = 51;
   const MIN_S = 0.8, MAX_S = 2.4;
@@ -392,7 +450,11 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
   let state = "ready", deck = [], missing = null, els = [], d = 0, t0 = 0, tFirst = null;
   let pick = { r: null, s: null };
   let deckMode = store.get("clock-deck") === "full" ? "full" : "half";
-  let roundCfg = "";
+  let practice = store.get("clock-practice") === "timed" ? "timed" : "free";
+  let pace = (() => { const v = parseFloat(store.get("clock-pace")); return v >= 2 && v <= 120 ? v : 20; })();
+  let roundCfg = "", roundDeck = "half", roundPractice = "free", roundPace = 20;
+  let phase = "scroll", tAns = 0, rafId = 0;
+  const cfgNow = () => practice === "timed" ? `timed-${pace}-${deckMode}` : `free-${deckMode}`;
   const sessions = {};
   const sessFor = c => sessions[c] || (sessions[c] = { n: 0, ok: 0, times: [] });
 
@@ -440,6 +502,12 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
   function buildPad() {
     pad.innerHTML = ""; keys = [];
     pick = { r: null, s: null };
+    if (roundPractice === "timed") {
+      const gv = document.createElement("div"); gv.className = "grid g10";
+      GROUPS.forEach(v => { const b = makeKey(v, () => answerValue(v)); b.dataset.g = v; b.disabled = true; gv.appendChild(b); });
+      pad.appendChild(gv);
+      return;
+    }
     const g = document.createElement("div"); g.className = "grid g13";
     RANKS.forEach(r => { const b = makeKey(r, el => choose("r", r, el)); b.dataset.r = r; g.appendChild(b); });
     const sg = document.createElement("div"); sg.className = "grid " + (deckMode === "full" ? "g4" : "g2");
@@ -462,12 +530,16 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
     missing = full.splice(Math.floor(Math.random() * 52), 1)[0];
     deck = shuffle(full);
     els = fillDeck(deckEl, deck);
+    cancelAnimationFrame(rafId);
     deckEl.hidden = true;
+    $("closedMsg").hidden = true;
     ready.hidden = false;
     d = 0; layout(els, d);
 
-    roundCfg = deckMode;
-    const tail = "<br>Swipe right to spread. The clock starts when the first card shows.";
+    roundCfg = cfgNow(); roundDeck = deckMode; roundPractice = practice; roundPace = pace;
+    const tail = practice === "timed"
+      ? `<br>The deck scrolls by itself over ${pace}s, then closes. Name the missing value.`
+      : "<br>Swipe right to spread. The clock starts when the first card shows.";
     if (deckMode === "full") {
       $("missing").innerHTML = `Missing card: <b>any colour</b>`;
       $("readyText").innerHTML = `51 cards. One card is missing.${tail}`;
@@ -487,11 +559,59 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
   function start() {
     if (state !== "ready") return;
     ready.hidden = true; deckEl.hidden = false;
-    keys.forEach(k => k.disabled = false);
     setState("running");
     t0 = performance.now();
     tFirst = null;
     table.focus({ preventScroll: true });
+    if (roundPractice === "timed") {
+      phase = "scroll";
+      rafId = requestAnimationFrame(autoTick);
+    } else {
+      keys.forEach(k => k.disabled = false);
+    }
+  }
+
+  // Timed pass: constant pace from the first card (d = 0) to the last card's corner
+  // (d = (N-1)*GAP) over the chosen time, then the last card gets one card's worth of
+  // exposure before the deck closes.
+  function autoTick() {
+    if (state !== "running" || roundPractice !== "timed") return;
+    const T = roundPace * 1000, el = performance.now() - t0;
+    d = Math.min(1, el / T) * (DECK_N - 1) * GAP;
+    layout(els, d);
+    if (el >= T + T / (DECK_N - 1)) { closeDeck(); return; }
+    rafId = requestAnimationFrame(autoTick);
+  }
+  function closeDeck() {
+    deckEl.hidden = true;
+    $("closedMsg").hidden = false;
+    phase = "answer";
+    keys.forEach(k => k.disabled = false);
+    tAns = performance.now();
+  }
+
+  function answerValue(g) {
+    if (state !== "running" || phase !== "answer") return;
+    const secs = (performance.now() - tAns) / 1000;
+    const truth = groupOf(missing.r), ok = g === truth;
+    mark("g", truth, g);
+    keys.forEach(k => k.disabled = true);
+    const sess = sessFor(roundCfg);
+    sess.n++;
+    if (ok) { sess.ok++; sess.times.push(secs); }
+    history.push({ ts: Date.now(), mode: "timed", deck: roundDeck, pace: roundPace, r: missing.r, s: missing.s, ok, answer: r3(secs) });
+    saveHistory();
+    timerEl.textContent = secs.toFixed(2) + "s";
+    resultEl.innerHTML = `
+      <div class="mini">${cardHTML(missing)}</div>
+      <div class="verdict">
+        <div class="head ${ok ? "ok" : "no"}">${ok ? "Correct" : "Missed"} · ${label(missing)} (${truth})${ok ? "" : `<span class="picked-note"> · you picked ${g}</span>`}</div>
+        <div class="total">${roundPace}s first pass</div>
+        <div class="sub">answered ${secs.toFixed(2)}s after the deck closed</div>
+      </div>`;
+    setState("done");
+    $("nextBtn").focus({ preventScroll: true });
+    renderSessionLine();
   }
 
   const mark = (attr, truth, chosen) => keys.forEach(k => {
@@ -512,8 +632,7 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
     const sess = sessFor(roundCfg);
     sess.n++;
     if (ok) { sess.ok++; sess.times.push(secs); }
-    const r3 = x => Math.round(x * 1000) / 1000;
-    history.push({ ts: Date.now(), deck: roundCfg, r: missing.r, s: missing.s, ok,
+    history.push({ ts: Date.now(), mode: "free", deck: roundDeck, r: missing.r, s: missing.s, ok,
       total: r3(secs), first: tFirst === null ? null : r3(tFirst) });
     saveHistory();
 
@@ -534,14 +653,15 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
   }
 
   function renderSessionLine() {
-    const c = state === "done" ? roundCfg : deckMode;
-    const sess = sessFor(c);
-    const parts = [c === "full" ? "Full deck" : "Half deck"];
+    const live = state === "done" || state === "running";
+    const sess = sessFor(live ? roundCfg : cfgNow());
+    const pr = live ? roundPractice : practice, dk = live ? roundDeck : deckMode, pc = live ? roundPace : pace;
+    const parts = [pr === "timed" ? `Timed ${pc}s pass` : "Free spread", dk === "full" ? "Full deck" : "Half deck"];
     if (sess.n) {
       parts.push(`${sess.ok}/${sess.n} correct this session`);
       if (sess.times.length) parts.push(`avg ${(sess.times.reduce((a, b) => a + b, 0) / sess.times.length).toFixed(1)}s`);
     }
-    const bests = history.filter(h => h.deck === c && h.ok).map(h => h.total);
+    const bests = pr === "timed" ? [] : history.filter(h => h.mode !== "timed" && h.deck === dk && h.ok).map(h => h.total);
     if (bests.length) parts.push(`best ${Math.min(...bests).toFixed(1)}s`);
     $("stats").textContent = parts.join("  ·  ");
   }
@@ -620,9 +740,9 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
       tFirst = (performance.now() - t0) / 1000;
     }
   }
-  attachSpread(table, { active: () => state === "running", move: dx => setProg(d + dx) });
+  attachSpread(table, { active: () => state === "running" && roundPractice === "free", move: dx => setProg(d + dx) });
   document.addEventListener("keydown", e => {
-    if (state !== "running" || !sheet.hidden) return;
+    if (state !== "running" || roundPractice !== "free" || !sheet.hidden) return;
     if (e.key === "ArrowRight") { setProg(d + GAP); e.preventDefault(); }
     else if (e.key === "ArrowLeft") { setProg(d - GAP); e.preventDefault(); }
   });
@@ -664,9 +784,27 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
     r.addEventListener("change", () => {
       if (!r.checked) return;
       deckMode = r.value; store.set("clock-deck", deckMode);
-      if (state === "ready") newRound(); else renderSessionLine();
     });
   });
+
+  const paceEl = $("pace");
+  paceEl.value = pace;
+  const syncPractice = () => { $("paceRow").hidden = practice !== "timed"; };
+  document.querySelectorAll('input[name="practice"]').forEach(r => {
+    r.checked = r.value === practice;
+    r.addEventListener("change", () => {
+      if (!r.checked) return;
+      practice = r.value; store.set("clock-practice", practice);
+      syncPractice();
+    });
+  });
+  const readPace = () => {
+    const v = parseFloat(paceEl.value);
+    if (v >= 2 && v <= 120) { pace = Math.round(v * 10) / 10; store.set("clock-pace", pace); }
+  };
+  paceEl.addEventListener("input", readPace);
+  paceEl.addEventListener("change", () => { readPace(); paceEl.value = pace; });
+  syncPractice();
 
   $("settingsBtn").addEventListener("click", () => {
     if (state === "running") return;
@@ -678,14 +816,15 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
   });
   const closeSettings = () => {
     sheet.hidden = true;
-    // A finished round played with another deck setting moves straight on to a fresh deck.
-    if (state === "done" && roundCfg !== deckMode) newRound();
+    paceEl.value = pace;
+    // A changed setting deals a fresh deck so the next round uses it.
+    if (state !== "running" && roundCfg !== cfgNow()) newRound();
     $("settingsBtn").focus({ preventScroll: true });
   };
   $("doneBtn").addEventListener("click", closeSettings);
 
   // ---------- Stats ----------
-  let statsDeck = deckMode, histMetric = "total";
+  let statsDeck = deckMode, statsMode = practice, histMetric = "total";
   const fmt = x => x === null || x === undefined || !isFinite(x) ? "—" : x.toFixed(2) + "s";
   const avg = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : null;
   const NS = "http://www.w3.org/2000/svg";
@@ -694,6 +833,10 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
   function setPills(id, v) {
     $(id).querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === v)));
   }
+  $("statsMode").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    statsMode = b.dataset.v; renderStats();
+  });
   $("statsDeck").addEventListener("click", e => {
     const b = e.target.closest("button"); if (!b) return;
     statsDeck = b.dataset.v; renderStats();
@@ -829,10 +972,71 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
     hit.addEventListener("pointerleave", () => { cross.setAttribute("visibility", "hidden"); hideTip(el); });
   }
 
+  function drawRate(el, groups) {
+    if (!groups.length) { el.innerHTML = `<div class="empty">No timed decks yet. Choose Timed pass in Settings to start.</div>`; return; }
+    const W = Math.max(280, el.clientWidth), H = 210, m = { l: 40, r: 8, t: 20, b: 26 };
+    const pw = W - m.l - m.r, ph = H - m.t - m.b, n = groups.length;
+    const colW = pw / n, bw = Math.max(4, Math.min(56, colW - 2));
+    const y = v => m.t + ph - v * ph;
+    let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Success rate by first-pass length">`;
+    [0, .25, .5, .75, 1].forEach(t => {
+      s += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line)" stroke-width="1"/>`;
+      s += `<text x="${m.l - 6}" y="${y(t) + 4}" text-anchor="end">${t * 100}%</text>`;
+    });
+    const every = Math.ceil(n / 8);
+    groups.forEach((g, i) => {
+      const cx = m.l + (i + 0.5) * colW, rate = g.ok / g.n, x = cx - bw / 2;
+      if (g.ok) s += `<path d="${barPath(x, y(rate), bw, y(0) - y(rate))}" fill="var(--c-first)"/>`;
+      if (n <= 12) s += `<text x="${cx}" y="${y(rate) - 6}" text-anchor="middle">${g.ok}/${g.n}</text>`;
+      if (i % every === 0) s += `<text x="${cx}" y="${H - 8}" text-anchor="middle">${secLabel(g.pace)}</text>`;
+    });
+    groups.forEach((g, i) => { s += `<rect class="hit" data-i="${i}" x="${m.l + i * colW}" y="${m.t}" width="${colW}" height="${ph}" fill="transparent"/>`; });
+    s += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(0)}" y2="${y(0)}" stroke="var(--muted)" stroke-width="1"/></svg>`;
+    el.innerHTML = s;
+    el.querySelectorAll(".hit").forEach(r => {
+      const g = groups[+r.dataset.i], i = +r.dataset.i;
+      const enter = () => {
+        const k = el.querySelector("svg").getBoundingClientRect().width / W;
+        showTip(el, (m.l + (i + 0.5) * colW) * k, Math.max(4, y(g.ok / g.n) * k),
+          `<b>${secLabel(g.pace)} first pass</b><br>${g.ok} of ${g.n} correct (${Math.round(100 * g.ok / g.n)}%)<br>avg answer ${fmt(avg(g.ans))}`);
+      };
+      r.addEventListener("pointerenter", enter);
+      r.addEventListener("pointerdown", enter);
+      r.addEventListener("pointerleave", () => hideTip(el));
+    });
+  }
+
+  function renderTimed() {
+    const all = history.filter(h => h.mode === "timed" && h.deck === statsDeck);
+    const okN = all.filter(h => h.ok).length;
+    $("statsSummary").textContent = all.length
+      ? `${all.length} timed deck${all.length === 1 ? "" : "s"} · ${Math.round(100 * okN / all.length)}% correct overall`
+      : "No timed decks saved yet for this deck.";
+    const by = new Map();
+    all.forEach(h => {
+      const g = by.get(h.pace) || { pace: h.pace, n: 0, ok: 0, ans: [] };
+      g.n++; if (h.ok) g.ok++; g.ans.push(h.answer); by.set(h.pace, g);
+    });
+    const groups = [...by.values()].sort((a, b) => a.pace - b.pace);
+    drawRate($("paceChart"), groups);
+    $("paceTable").tBodies[0].innerHTML = groups.length ? groups.map(g => `<tr>
+        <td>${secLabel(g.pace)}</td><td>${g.n}</td><td>${g.ok}</td><td>${Math.round(100 * g.ok / g.n)}%</td><td>${fmt(avg(g.ans))}</td>
+      </tr>`).join("") : `<tr><td colspan="5" style="text-align:left;color:var(--muted)">No timed decks yet.</td></tr>`;
+    const recent = all.slice(-10).reverse();
+    $("timedRecent").tBodies[0].innerHTML = recent.length ? recent.map(h => `<tr>
+        <td class="${isRed(h.s) ? "red-ink" : ""}">${esc(h.r + h.s + VS)}</td><td>${secLabel(h.pace)}</td>
+        <td>${h.ok ? '<span class="ok-mark">✓</span>' : '<span class="no-mark">✗</span>'}</td><td>${fmt(h.answer)}</td>
+      </tr>`).join("") : `<tr><td colspan="4" style="text-align:left;color:var(--muted)">No decks yet.</td></tr>`;
+  }
+
   function renderStats() {
+    setPills("statsMode", statsMode);
     setPills("statsDeck", statsDeck);
     setPills("histMetric", histMetric);
-    const all = history.filter(h => h.deck === statsDeck);
+    $("freeStats").hidden = statsMode !== "free";
+    $("timedStats").hidden = statsMode !== "timed";
+    if (statsMode === "timed") { renderTimed(); return; }
+    const all = history.filter(h => h.mode !== "timed" && h.deck === statsDeck);
     const good = all.filter(h => h.ok);
     const passes = good.filter(h => h.first !== null);
     const totals = good.map(h => h.total);
@@ -841,7 +1045,7 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
 
     $("statsSummary").textContent = all.length
       ? `${all.length} deck${all.length === 1 ? "" : "s"} · ${Math.round(100 * good.length / all.length)}% correct · times use correct answers only`
-      : "No decks saved yet for this mode.";
+      : "No decks saved yet for this deck.";
 
     const row = (name, color, a) => `<tr><td><span class="rowname"><i class="sw" style="background:${color}"></i>${name}</span></td>
       <td>${fmt(avg(a.slice(-10)))}</td><td>${fmt(avg(a))}</td><td>${a.length ? fmt(Math.min(...a)) : "—"}</td></tr>`;
@@ -874,7 +1078,8 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
 
   $("statsBtn").addEventListener("click", () => {
     if (state === "running") return;
-    statsDeck = state === "done" ? roundCfg : deckMode;
+    statsDeck = state === "done" ? roundDeck : deckMode;
+    statsMode = state === "done" ? roundPractice : practice;
     $("confirmClear").hidden = true; $("clearBtn").hidden = false;
     statsSheet.hidden = false;
     renderStats();
