@@ -144,6 +144,9 @@ body[data-state="running"] .off-clock { display: none; }
 .grid { display: grid; gap: 8px; }
 .grid.g13 { grid-template-columns: repeat(7, 1fr); }
 .grid.g10 { grid-template-columns: repeat(5, 1fr); }
+.grid.g1 { grid-template-columns: 1fr; }
+.key.idk { font: 600 15px var(--f-ui); letter-spacing: 0; color: var(--muted); }
+.countdown { position: absolute; inset: 0; display: grid; place-items: center; font: 600 72px var(--f-index); color: var(--fg); font-variant-numeric: tabular-nums; }
 .grid.g2 { grid-template-columns: repeat(2, 1fr); }
 .grid.g4 { grid-template-columns: repeat(4, 1fr); }
 @media (min-width: 700px) { .grid.g13 { grid-template-columns: repeat(13, 1fr); } .grid.g10 { grid-template-columns: repeat(10, 1fr); } }
@@ -265,6 +268,7 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
 
   <div class="table" id="table" tabindex="0" aria-label="Deck spread. Drag right or use the right arrow key.">
     <div class="deck" id="deck"></div>
+    <div class="countdown" id="countdown" hidden aria-live="assertive"></div>
     <div id="ready">
       <div class="back"></div>
       <div class="prompt">
@@ -395,7 +399,7 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
       </div>
       <div class="panel tbl-wrap">
         <table class="data" id="paceTable">
-          <thead><tr><th>First pass</th><th>Decks</th><th>Correct</th><th>Success</th><th>Avg answer</th></tr></thead>
+          <thead><tr><th>First pass</th><th>Decks</th><th>Correct</th><th>IDK</th><th>Success</th><th>Avg answer</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -504,6 +508,9 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
       const gv = document.createElement("div"); gv.className = "grid g10";
       GROUPS.forEach(v => { const b = makeKey(v, () => answerValue(v)); b.dataset.g = v; b.disabled = true; gv.appendChild(b); });
       pad.appendChild(gv);
+      const gi = document.createElement("div"); gi.className = "grid g1";
+      const idk = makeKey("I don't know", () => answerValue("IDK"), "idk"); idk.dataset.g = "IDK"; idk.disabled = true;
+      gi.appendChild(idk); pad.appendChild(gi);
       return;
     }
     const g = document.createElement("div"); g.className = "grid g13";
@@ -529,6 +536,7 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
     deck = shuffle(full);
     els = fillDeck(deckEl, deck);
     cancelAnimationFrame(rafId);
+    $("countdown").hidden = true;
     deckEl.hidden = true;
     ready.hidden = false;
     d = 0; layout(els, d);
@@ -555,15 +563,28 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
 
   function start() {
     if (state !== "ready") return;
-    ready.hidden = true; deckEl.hidden = false;
+    ready.hidden = true;
     setState("running");
-    t0 = performance.now();
     tFirst = null;
     table.focus({ preventScroll: true });
     if (roundPractice === "timed") {
-      phase = "scroll";
-      rafId = requestAnimationFrame(autoTick);
+      // 3-second countdown with the deck hidden; the pass starts when it reaches zero.
+      phase = "countdown";
+      const cd = $("countdown"), tc = performance.now();
+      cd.hidden = false;
+      const count = () => {
+        if (state !== "running" || phase !== "countdown") return;
+        const left = 3 - (performance.now() - tc) / 1000;
+        if (left > 0) { cd.textContent = Math.ceil(left); rafId = requestAnimationFrame(count); return; }
+        cd.hidden = true; deckEl.hidden = false;
+        phase = "scroll";
+        t0 = performance.now();
+        rafId = requestAnimationFrame(autoTick);
+      };
+      count();
     } else {
+      deckEl.hidden = false;
+      t0 = performance.now();
       keys.forEach(k => k.disabled = false);
     }
   }
@@ -589,19 +610,19 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
   function answerValue(g) {
     if (state !== "running" || phase !== "answer") return;
     const secs = (performance.now() - tAns) / 1000;
-    const truth = groupOf(missing.r), ok = g === truth;
+    const truth = groupOf(missing.r), ok = g === truth, idk = g === "IDK";
     mark("g", truth, g);
     keys.forEach(k => k.disabled = true);
     const sess = sessFor(roundCfg);
     sess.n++;
     if (ok) { sess.ok++; sess.times.push(secs); }
-    history.push({ ts: Date.now(), mode: "timed", deck: roundDeck, pace: roundPace, r: missing.r, s: missing.s, ok, answer: r3(secs) });
+    history.push({ ts: Date.now(), mode: "timed", deck: roundDeck, pace: roundPace, r: missing.r, s: missing.s, ok, idk, answer: r3(secs) });
     saveHistory();
     timerEl.textContent = secs.toFixed(2) + "s";
     resultEl.innerHTML = `
       <div class="mini">${cardHTML(missing)}</div>
       <div class="verdict">
-        <div class="head ${ok ? "ok" : "no"}">${ok ? "Correct" : "Missed"} · ${label(missing)} (${truth})${ok ? "" : `<span class="picked-note"> · you picked ${g}</span>`}</div>
+        <div class="head ${ok ? "ok" : "no"}">${ok ? "Correct" : "Missed"} · ${label(missing)} (${truth})${ok ? "" : `<span class="picked-note"> · ${idk ? "you chose I don't know" : "you picked " + g}</span>`}</div>
         <div class="total">${roundPace}s first pass</div>
         <div class="sub">answered ${secs.toFixed(2)}s after the pass ended</div>
       </div>`;
@@ -994,7 +1015,7 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
       const enter = () => {
         const k = el.querySelector("svg").getBoundingClientRect().width / W;
         showTip(el, (m.l + (i + 0.5) * colW) * k, Math.max(4, y(g.ok / g.n) * k),
-          `<b>${secLabel(g.pace)} first pass</b><br>${g.ok} of ${g.n} correct (${Math.round(100 * g.ok / g.n)}%)<br>avg answer ${fmt(avg(g.ans))}`);
+          `<b>${secLabel(g.pace)} first pass</b><br>${g.ok} of ${g.n} correct (${Math.round(100 * g.ok / g.n)}%)${g.idk ? `<br>${g.idk} I don't know` : ""}<br>avg answer ${fmt(avg(g.ans))}`);
       };
       r.addEventListener("pointerenter", enter);
       r.addEventListener("pointerdown", enter);
@@ -1005,23 +1026,24 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
   function renderTimed() {
     const all = history.filter(h => h.mode === "timed" && h.deck === statsDeck);
     const okN = all.filter(h => h.ok).length;
+    const idkN = all.filter(h => h.idk).length;
     $("statsSummary").textContent = all.length
-      ? `${all.length} timed deck${all.length === 1 ? "" : "s"} · ${Math.round(100 * okN / all.length)}% correct overall`
+      ? `${all.length} timed deck${all.length === 1 ? "" : "s"} · ${Math.round(100 * okN / all.length)}% correct overall · ${idkN} I don't know (counted as misses)`
       : "No timed decks saved yet for this deck.";
     const by = new Map();
     all.forEach(h => {
-      const g = by.get(h.pace) || { pace: h.pace, n: 0, ok: 0, ans: [] };
-      g.n++; if (h.ok) g.ok++; g.ans.push(h.answer); by.set(h.pace, g);
+      const g = by.get(h.pace) || { pace: h.pace, n: 0, ok: 0, idk: 0, ans: [] };
+      g.n++; if (h.ok) g.ok++; if (h.idk) g.idk++; g.ans.push(h.answer); by.set(h.pace, g);
     });
     const groups = [...by.values()].sort((a, b) => a.pace - b.pace);
     drawRate($("paceChart"), groups);
     $("paceTable").tBodies[0].innerHTML = groups.length ? groups.map(g => `<tr>
-        <td>${secLabel(g.pace)}</td><td>${g.n}</td><td>${g.ok}</td><td>${Math.round(100 * g.ok / g.n)}%</td><td>${fmt(avg(g.ans))}</td>
-      </tr>`).join("") : `<tr><td colspan="5" style="text-align:left;color:var(--muted)">No timed decks yet.</td></tr>`;
+        <td>${secLabel(g.pace)}</td><td>${g.n}</td><td>${g.ok}</td><td>${g.idk}</td><td>${Math.round(100 * g.ok / g.n)}%</td><td>${fmt(avg(g.ans))}</td>
+      </tr>`).join("") : `<tr><td colspan="6" style="text-align:left;color:var(--muted)">No timed decks yet.</td></tr>`;
     const recent = all.slice(-10).reverse();
     $("timedRecent").tBodies[0].innerHTML = recent.length ? recent.map(h => `<tr>
         <td class="${isRed(h.s) ? "red-ink" : ""}">${esc(h.r + h.s + VS)}</td><td>${secLabel(h.pace)}</td>
-        <td>${h.ok ? '<span class="ok-mark">✓</span>' : '<span class="no-mark">✗</span>'}</td><td>${fmt(h.answer)}</td>
+        <td>${h.ok ? '<span class="ok-mark">✓</span>' : h.idk ? '<span class="no-mark">IDK</span>' : '<span class="no-mark">✗</span>'}</td><td>${fmt(h.answer)}</td>
       </tr>`).join("") : `<tr><td colspan="4" style="text-align:left;color:var(--muted)">No decks yet.</td></tr>`;
   }
 
