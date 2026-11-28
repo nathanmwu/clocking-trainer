@@ -232,7 +232,6 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
   border: 1px solid var(--line); background: var(--surface); color: var(--fg); -webkit-user-select: text; user-select: text;
 }
 .num-row input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.closed { position: absolute; inset: 0; display: grid; place-items: center; font-size: 15px; color: var(--muted); text-align: center; padding: 0 16px; }
 .filters { display: flex; gap: 8px; flex-wrap: wrap; }
 .stack { display: flex; flex-direction: column; gap: 20px; }
 .clear-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
@@ -266,7 +265,6 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
 
   <div class="table" id="table" tabindex="0" aria-label="Deck spread. Drag right or use the right arrow key.">
     <div class="deck" id="deck"></div>
-    <div class="closed" id="closedMsg" hidden>Deck closed. Name the missing value.</div>
     <div id="ready">
       <div class="back"></div>
       <div class="prompt">
@@ -532,13 +530,12 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
     els = fillDeck(deckEl, deck);
     cancelAnimationFrame(rafId);
     deckEl.hidden = true;
-    $("closedMsg").hidden = true;
     ready.hidden = false;
     d = 0; layout(els, d);
 
     roundCfg = cfgNow(); roundDeck = deckMode; roundPractice = practice; roundPace = pace;
     const tail = practice === "timed"
-      ? `<br>The deck scrolls by itself over ${pace}s, then closes. Name the missing value.`
+      ? `<br>The deck scrolls by itself over ${pace}s, then stops. Name the missing value.`
       : "<br>Swipe right to spread. The clock starts when the first card shows.";
     if (deckMode === "full") {
       $("missing").innerHTML = `Missing card: <b>any colour</b>`;
@@ -573,7 +570,7 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
 
   // Timed pass: constant pace from the first card (d = 0) to the last card's corner
   // (d = (N-1)*GAP) over the chosen time, then the last card gets one card's worth of
-  // exposure before the deck closes.
+  // exposure before the answer buttons unlock.
   function autoTick() {
     if (state !== "running" || roundPractice !== "timed") return;
     const T = roundPace * 1000, el = performance.now() - t0;
@@ -582,9 +579,8 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
     if (el >= T + T / (DECK_N - 1)) { closeDeck(); return; }
     rafId = requestAnimationFrame(autoTick);
   }
+  // The spread stays on the table, frozen at the last card, while the user answers.
   function closeDeck() {
-    deckEl.hidden = true;
-    $("closedMsg").hidden = false;
     phase = "answer";
     keys.forEach(k => k.disabled = false);
     tAns = performance.now();
@@ -607,7 +603,7 @@ table.data .rowname { display: inline-flex; align-items: center; gap: 8px; font-
       <div class="verdict">
         <div class="head ${ok ? "ok" : "no"}">${ok ? "Correct" : "Missed"} · ${label(missing)} (${truth})${ok ? "" : `<span class="picked-note"> · you picked ${g}</span>`}</div>
         <div class="total">${roundPace}s first pass</div>
-        <div class="sub">answered ${secs.toFixed(2)}s after the deck closed</div>
+        <div class="sub">answered ${secs.toFixed(2)}s after the pass ended</div>
       </div>`;
     setState("done");
     $("nextBtn").focus({ preventScroll: true });
